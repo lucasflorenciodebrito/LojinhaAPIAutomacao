@@ -1,30 +1,39 @@
 package modulos.produto;
 
 
+import dataFactory.ProdutoDataFactory;
+import dataFactory.UsuarioDataFactory;
 import io.restassured.RestAssured;
 import io.restassured.http.ContentType;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
+import pojo.ComponentPojo;
+import pojo.ProdutoPojo;
+import pojo.UsuarioPojo;
+
+import java.util.ArrayList;
+import java.util.List;
+
 import static io.restassured.RestAssured.*;
 import static  io.restassured.matcher.RestAssuredMatchers.*;
 import static org.hamcrest.Matchers.*;
 
 @DisplayName("Testes de API Rest do módulo de Produto")
 public class ProdutoTest {
-    @Test
-    @DisplayName("Validar os limites proibidos do valor do produto")
-    public void testValidarLimitesProibidosValorProduto(){
-       //Configurando os dados da API Rest da Lojinha
+    private String token;
+
+    @BeforeEach
+    public void beforeEach(){
+        //Configurando os dados da API Rest da Lojinha
         baseURI = "http://165.227.93.41";
         //port =8080
         basePath = "/lojinha";   //Caminho inicial
         //Obter o token do usuário admin
-        String token = given()
+
+        this.token = given()
                 .contentType(ContentType.JSON)
-                .body("{\n" +
-                        "  \"usuarioLogin\": \"admin\",\n" +
-                        "  \"usuarioSenha\": \"admin\"\n" +
-                        "}")
+                .body(UsuarioDataFactory.adicionaUsuario("admin", "admin"))
             .when()
                 .post("/v2/login")
             .then()
@@ -33,36 +42,43 @@ public class ProdutoTest {
 
         System.out.println(token);
 
+    }
+
+    @Test
+    @DisplayName("Validar que o valor do limite igual a 0.00 não é permitido")
+    public void testValidarLimitesZeradoProibidoValorProduto(){
         //Tentar inserir um produto com valor 0.00 e validar que a mensagem de erro foi apresentada e
         // o status code retornado foi 422
 
         given()
             .contentType(ContentType.JSON)
+            .header("token", this.token)
+            .body(ProdutoDataFactory.criarProdutoComumComValorIgualA(0.00))
+        .when()
+            .post("/v2/produtos")
+        .then()
+            .assertThat()
+                .body("error", equalTo("O valor do produto deve estar entre R$ 0,01 e R$ 7.000,00"))
+                .statusCode(422);
+
+
+    }
+    @Test
+    @DisplayName("Validar que o valor do limite igual a 7000.01 não é permitido")
+    public void testValidarLimiteMaiorSeteMilProibidoValorProduto(){
+        //Tentar inserir um produto com valor maior que 7000.01 e validar que a mensagem de erro foi apresentada e
+        // o status code retornado foi 422
+
+        given()
+            .contentType(ContentType.JSON)
             .header("token", token)
-            .body("{\n" +
-                        "  \"produtoNome\": \"Play Station 5\",\n" +
-                        "  \"produtoValor\": 0.00,\n" +
-                        "  \"produtoCores\": [\n" +
-                        "    \"preto\", \"branco\"\n" +
-                        "  ],\n" +
-                        "  \"produtoUrlMock\": \"\",\n" +
-                        "  \"componentes\": [\n" +
-                        "    {\n" +
-                        "      \"componenteNome\": \"Controle\",\n" +
-                        "      \"componenteQuantidade\": 2\n" +
-                        "    },\n" +
-                        "    {\n" +
-                        "      \"componenteNome\": \"Jogo de Aventura\",\n" +
-                        "      \"componenteQuantidade\": 1\n" +
-                        "    }\n" +
-                        "  ]\n" +
-                        "}")
-            .when()
-                .post("/v2/produtos")
-            .then()
-                .assertThat()
-                    .body("error", equalTo("O valor do produto deve estar entre R$ 0,01 e R$ 7.000,00"))
-                    .statusCode(422);
+            .body(ProdutoDataFactory.criarProdutoComumComValorIgualA(7000.01))
+    .when()
+        .post("/v2/produtos")
+    .then()
+        .assertThat()
+            .body("error", equalTo("O valor do produto deve estar entre R$ 0,01 e R$ 7.000,00"))
+            .statusCode(422);
 
 
     }
